@@ -9,9 +9,11 @@
 
 import {
   EuiButton,
+  EuiButtonIcon,
   EuiDatePicker,
   EuiFlexGroup,
   EuiFlexItem,
+  EuiToolTip,
   useEuiTheme,
   useGeneratedHtmlId,
   type EuiButtonColor,
@@ -99,6 +101,9 @@ import { useDataSourceBrowser } from './resource_browser/use_data_source_browser
 import { useSourcesBadge } from './resource_browser/use_resource_browser_badge';
 
 const BREAKPOINT_WIDTH = 540;
+const exitFullScreenLabel = i18n.translate('esqlEditor.query.exitFullScreenAriaLabel', {
+  defaultMessage: 'Exit full screen',
+});
 
 // React.memo is applied inside the withRestorableState HOC (called below)
 const ESQLEditorInternal = function ESQLEditor({
@@ -387,6 +392,17 @@ const ESQLEditorInternal = function ESQLEditor({
 
   useEffect(() => {
     if (!isFullScreen) {
+      return;
+    }
+
+    // In fullscreen mode we prioritize editor canvas height for content visibility.
+    setIsHistoryOpen(false);
+    setIsLanguageComponentOpen(false);
+    setIsVisorOpen(false);
+  }, [isFullScreen, setIsHistoryOpen, setIsVisorOpen]);
+
+  useEffect(() => {
+    if (!isFullScreen) {
       setMeasuredFullScreenEditorHeight(undefined);
       return;
     }
@@ -422,6 +438,29 @@ const ESQLEditorInternal = function ESQLEditor({
       cancelAnimationFrame(raf);
     };
   }, [isFullScreen]);
+
+  useEffect(() => {
+    if (!isFullScreen) {
+      return;
+    }
+
+    const raf = requestAnimationFrame(() => {
+      const editor = editorRef.current;
+      const container = containerRef.current;
+      if (!editor || !container) {
+        return;
+      }
+
+      const { width, height } = container.getBoundingClientRect();
+      if (width > 0 && height > 0) {
+        editor.layout({ width, height });
+      } else {
+        editor.layout();
+      }
+    });
+
+    return () => cancelAnimationFrame(raf);
+  }, [isFullScreen, measuredFullScreenEditorHeight]);
 
   const triggerSuggestions = useCallback(() => {
     setTimeout(() => {
@@ -818,7 +857,10 @@ const ESQLEditorInternal = function ESQLEditor({
                         defaultMessage: 'Start typing ES|QL',
                       })
                 }
-                options={codeEditorOptions}
+                options={{
+                  ...codeEditorOptions,
+                  ...(isFullScreen ? { lineNumbers: 'on' } : {}),
+                }}
                 width="100%"
                 suggestionProvider={suggestionProvider}
                 hoverProvider={codeEditorHoverProvider}
@@ -959,7 +1001,7 @@ const ESQLEditorInternal = function ESQLEditor({
           </EuiFlexItem>
         </div>
       </EuiFlexGroup>
-      {!hideQuickSearch && (
+      {!hideQuickSearch && !isFullScreen && (
         <QuickSearchVisor
           query={code}
           isInline={Boolean(editorIsInline)}
@@ -972,7 +1014,7 @@ const ESQLEditorInternal = function ESQLEditor({
           telemetryService={telemetryService}
         />
       )}
-      {(isHistoryOpen || (isLanguageComponentOpen && editorIsInline)) && (
+      {!isFullScreen && (isHistoryOpen || (isLanguageComponentOpen && editorIsInline)) && (
         <ResizableButton
           onMouseDownResizeHandler={(mouseDownEvent) => {
             onMouseDownResize(
@@ -994,31 +1036,33 @@ const ESQLEditorInternal = function ESQLEditor({
           }
         />
       )}
-      <EditorFooter
-        styles={{
-          bottomContainer: styles.bottomContainer,
-          historyContainer: styles.historyContainer,
-        }}
-        onUpdateAndSubmitQuery={onUpdateAndSubmitQuery}
-        onPrettifyQuery={onPrettifyQuery}
-        editorIsInline={editorIsInline}
-        isSpaceReduced={isSpaceReduced}
-        isHistoryOpen={isHistoryOpen}
-        setIsHistoryOpen={onClickQueryHistory}
-        isLanguageComponentOpen={isLanguageComponentOpen}
-        setIsLanguageComponentOpen={setIsLanguageComponentOpen}
-        measuredContainerWidth={measuredEditorWidth}
-        resizableContainerButton={resizableContainerButton}
-        resizableContainerHeight={resizableContainerHeight}
-        displayDocumentationAsFlyout={displayDocumentationAsFlyout}
-        dataErrorsControl={dataErrorsControl}
-        starredQueriesService={starredQueriesService}
-        queryStats={queryStats}
-        isFullScreen={isFullScreen}
-        onToggleFullScreen={() => setIsFullScreen((v) => !v)}
-        {...editorMessages}
-        onErrorClick={onErrorClick}
-      />
+      {!isFullScreen && (
+        <EditorFooter
+          styles={{
+            bottomContainer: styles.bottomContainer,
+            historyContainer: styles.historyContainer,
+          }}
+          onUpdateAndSubmitQuery={onUpdateAndSubmitQuery}
+          onPrettifyQuery={onPrettifyQuery}
+          editorIsInline={editorIsInline}
+          isSpaceReduced={isSpaceReduced}
+          isHistoryOpen={isHistoryOpen}
+          setIsHistoryOpen={onClickQueryHistory}
+          isLanguageComponentOpen={isLanguageComponentOpen}
+          setIsLanguageComponentOpen={setIsLanguageComponentOpen}
+          measuredContainerWidth={measuredEditorWidth}
+          resizableContainerButton={resizableContainerButton}
+          resizableContainerHeight={resizableContainerHeight}
+          displayDocumentationAsFlyout={displayDocumentationAsFlyout}
+          dataErrorsControl={dataErrorsControl}
+          starredQueriesService={starredQueriesService}
+          queryStats={queryStats}
+          isFullScreen={isFullScreen}
+          onToggleFullScreen={() => setIsFullScreen((v) => !v)}
+          {...editorMessages}
+          onErrorClick={onErrorClick}
+        />
+      )}
       {createPortal(
         Object.keys(popoverPosition).length > 0 && (
           <div
@@ -1144,6 +1188,27 @@ const ESQLEditorInternal = function ESQLEditor({
 
   return (
     <div ref={fullScreenWrapperRef} css={fullScreenOverlayStyle}>
+      {isFullScreen && (
+        <div
+          css={css`
+            position: absolute;
+            top: ${theme.euiTheme.size.s};
+            right: ${theme.euiTheme.size.s};
+            z-index: ${theme.euiTheme.levels.modal + 1};
+          `}
+        >
+          <EuiToolTip position="left" content={exitFullScreenLabel} disableScreenReaderOutput>
+            <EuiButtonIcon
+              iconType="fullScreenExit"
+              color="text"
+              size="s"
+              data-test-subj="ESQLEditor-toggle-fullscreen-top-right"
+              aria-label={exitFullScreenLabel}
+              onClick={() => setIsFullScreen(false)}
+            />
+          </EuiToolTip>
+        </div>
+      )}
       {editorPanel}
     </div>
   );

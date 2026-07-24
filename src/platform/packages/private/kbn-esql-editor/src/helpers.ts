@@ -339,6 +339,11 @@ export const getEditorOverwrites = (theme: UseEuiTheme<{}>) => {
       color: ${theme.euiTheme.colors.textSubdued};
     }
 
+    .monaco-editor .view-lines {
+      box-sizing: border-box;
+      padding-right: 32px;
+    }
+
     .suggest-widget,
     .suggest-details-container {
       border-radius: ${theme.euiTheme.border.radius.medium};
