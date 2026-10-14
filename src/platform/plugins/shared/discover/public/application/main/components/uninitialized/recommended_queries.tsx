@@ -157,6 +157,7 @@ export const RecommendedQueries = ({ queries, onRunQuery }: RecommendedQueriesPr
           marginTop: euiTheme.size.base,
           width: '100%',
           minWidth: 0,
+          // minmax(0, 1fr) keeps long queries from stretching the columns.
           gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
           [`@media (max-width: ${euiTheme.breakpoint.m - 1}px)`]: {
             gridTemplateColumns: '1fr',

@@ -564,6 +564,7 @@ const componentStyles = {
     width: 'auto',
     height: 'auto',
     alignSelf: 'center',
+    maxWidth: '100%',
     marginTop: 'auto',
     marginBottom: 'auto',
     flexGrow: 0,
